@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Sail Ads — Live Dashboard</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
+body{background:#f5f5f5;padding:20px;}
+.wrap{max-width:1100px;margin:0 auto;}
+.topbar{background:#fff;border-radius:12px;padding:16px 20px;display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;border:1px solid #e5e5e5;}
+.logo{display:flex;align-items:center;gap:10px;}
+.logo-icon{width:36px;height:36px;background:#4285F4;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:18px;}
+.t1{font-size:15px;font-weight:600;color:#111;}
+.t2{font-size:12px;color:#888;}
+.pill{font-size:11px;padding:4px 10px;border-radius:20px;display:inline-flex;align-items:center;gap:4px;}
+.pg{background:#EAF3DE;color:#3B6D11;}
+.pa{background:#FAEEDA;color:#854F0B;}
+.pr{background:#FCEBEB;color:#A32D2D;}
+.pb{background:#E6F1FB;color:#185FA5;}
+.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;}
+.mc{background:#fff;border-radius:10px;padding:16px;border:1px solid #e5e5e5;}
+.mc-label{font-size:11px;color:#888;margin-bottom:8px;}
+.mc-val{font-size:24px;font-weight:600;color:#111;}
+.mc-sub{font-size:11px;color:#aaa;margin-top:4px;}
+.card{background:#fff;border-radius:12px;padding:16px 20px;margin-bottom:16px;border:1px solid #e5e5e5;}
+.card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
+.card-title{font-size:13px;font-weight:600;color:#111;}
+.col-hd{display:flex;gap:8px;padding:4px 0 8px;border-bottom:1px solid #f0f0f0;font-size:11px;color:#aaa;}
+.camp-row{display:flex;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid #f5f5f5;font-size:12px;}
+.camp-row:last-child{border-bottom:none;}
+.err{background:#FCEBEB;border:1px solid #F09595;border-radius:8px;padding:12px 16px;font-size:12px;color:#A32D2D;margin-bottom:12px;}
+.loading{display:flex;align-items:center;gap:10px;font-size:13px;color:#888;padding:20px 0;}
+.spinner{width:18px;height:18px;border:2px solid #e5e5e5;border-top-color:#4285F4;border-radius:50%;animation:spin 0.8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.rt-box{background:#EAF3DE;border:1px solid #C0DD97;border-radius:8px;padding:12px 16px;font-size:12px;color:#3B6D11;margin-bottom:14px;word-break:break-all;line-height:1.7;}
+.rt-box strong{display:block;margin-bottom:6px;font-size:13px;}
+input[type=text]{width:100%;border:1px solid #e0e0e0;border-radius:8px;padding:9px 14px;font-size:13px;outline:none;background:#fafafa;}
+input[type=text]:focus{border-color:#4285F4;}
+button{cursor:pointer;}
+.btn-blue{background:#4285F4;color:#fff;border:none;border-radius:8px;padding:9px 16px;font-size:13px;display:flex;align-items:center;gap:6px;}
+.btn-outline{background:#fff;border:1px solid #e0e0e0;border-radius:8px;padding:7px 14px;font-size:12px;color:#333;}
+.btn-outline:hover{background:#f5f5f5;}
+.ai-btn{width:100%;border:1px solid #e5e5e5;border-radius:8px;padding:9px 14px;background:#fafafa;color:#333;font-size:12px;text-align:left;display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+.ai-btn:hover{background:#f0f0f0;}
+.ai-row{display:flex;gap:8px;margin-top:10px;padding-top:10px;border-top:1px solid #f0f0f0;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <div class="logo">
+      <div class="logo-icon">G</div>
+      <div>
+        <div class="t1">Sail Ads — Live Dashboard</div>
+        <div class="t2" id="sub">Enter your refresh token to connect</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <span class="pill pa" id="status">Disconnected</span>
+      <button class="btn-outline" onclick="loadData()">&#8635; Refresh</button>
+    </div>
+  </div>
+
+  <div class="card" id="auth-card">
+    <div class="card-head"><div class="card-title">Connect your Google Ads account</div></div>
+    <p style="font-size:12px;color:#888;margin-bottom:10px;">Paste your refresh token below. Get a new one from Claude if needed.</p>
+    <div style="display:flex;gap:8px;">
+      <input type="text" id="rt-input" placeholder="Paste refresh token here..." />
+      <button class="btn-blue" onclick="connectWithRT()">Connect</button>
+    </div>
+  </div>
+
+  <div id="rt-display"></div>
+  <div id="msg"></div>
+  <div id="loading" style="display:none;"><div class="loading"><div class="spinner"></div><span id="ltxt">Connecting...</span></div></div>
+  <div id="dash" style="display:none;"></div>
+</div>
+
+<script>
+const PROXY = 'https://sail-ads-proxy.onrender.com';
+let AT = null, RT = localStorage.getItem('sail_rt') || null;
+
+function $(id){ return document.getElementById(id); }
+function setLoad(t){ $('ltxt').textContent=t; $('loading').style.display='block'; }
+function hideLoad(){ $('loading').style.display='none'; }
+function setStatus(t,c){ const p=$('status'); p.textContent=t; p.className='pill '+c; }
+function setSub(t){ $('sub').textContent=t; }
+function showErr(m){ $('msg').innerHTML=`<div class="err"><strong>Error:</strong> ${m}</div>`; hideLoad(); setStatus('Error','pr'); }
+
+if(RT){ $('rt-input').value=RT; }
+
+async function doRefresh(){
+  setLoad('Getting access token...');
+  const r = await fetch(`${PROXY}/token?refresh_token=${encodeURIComponent(RT)}`);
+  const d = await r.json();
+  if(d.error) throw new Error(d.error_description||d.error);
+  AT = d.access_token;
+}
+
+async function fetchCampaigns(){
+  setLoad('Fetching your campaigns...');
+  const r = await fetch(`${PROXY}/campaigns?access_token=${encodeURIComponent(AT)}`);
+  const d = await r.json();
+  if(d.error) throw new Error(JSON.stringify(d.error.message||d.error));
+  return d.results||[];
+}
+
+function fmt(n){ return Number(n||0).toLocaleString(); }
+function fmtUSD(m){ return '$'+(Number(m||0)/1e6).toFixed(2); }
+function fmtBudget(m){ return '$'+Math.round(Number(m||0)/1e6)+'/day'; }
+function fmtCTR(v){ return (Number(v||0)*100).toFixed(2)+'%'; }
+function sPill(s){ const m={ENABLED:['Active','pg'],PAUSED:['Paused','pa'],REMOVED:['Removed','pr']}; const[l,c]=m[s]||[s,'pb']; return `<span class="pill ${c}" style="font-size:10px;">${l}</span>`; }
+
+function render(rows){
+  hideLoad();
+  setStatus('Live','pg');
+  setSub('Sail Ads Manage · 910-785-3380 · Last 30 days · '+new Date().toLocaleTimeString());
+  let tI=0,tC=0,tCost=0,tConv=0;
+  rows.forEach(r=>{ const m=r.metrics||{}; tI+=Number(m.impressions||0); tC+=Number(m.clicks||0); tCost+=Number(m.costMicros||0); tConv+=Number(m.conversions||0); });
+  const cpc=tC>0?'$'+(tCost/1e6/tC).toFixed(2):'—';
+  const cpa=tConv>0?'$'+(tCost/1e6/tConv).toFixed(2):'—';
+  $('dash').style.display='block';
+  $('dash').innerHTML=`
+    <div class="metrics">
+      <div class="mc"><div class="mc-label">Total spend</div><div class="mc-val">${fmtUSD(tCost)}</div><div class="mc-sub">Last 30 days</div></div>
+      <div class="mc"><div class="mc-label">Impressions</div><div class="mc-val">${fmt(tI)}</div><div class="mc-sub">Last 30 days</div></div>
+      <div class="mc"><div class="mc-label">Clicks</div><div class="mc-val">${fmt(tC)}</div><div class="mc-sub">Avg CPC: ${cpc}</div></div>
+      <div class="mc"><div class="mc-label">Conversions</div><div class="mc-val">${Math.round(tConv)}</div><div class="mc-sub">CPA: ${cpa}</div></div>
+    </div>
+    <div class="card">
+      <div class="card-head"><div class="card-title">Your campaigns</div><span class="pill pb">${rows.length} campaigns</span></div>
+      ${rows.length===0
+        ? '<p style="font-size:13px;color:#888;padding:10px 0;">No campaign activity in the last 30 days.</p>'
+        : `<div class="col-hd"><span style="flex:2;">Campaign</span><span style="flex:1;">Status</span><span style="flex:1;text-align:right;">Budget</span><span style="flex:1;text-align:right;">Impr.</span><span style="flex:1;text-align:right;">Clicks</span><span style="flex:1;text-align:right;">CTR</span><span style="flex:1;text-align:right;">Spend</span><span style="flex:1;text-align:right;">Conv.</span></div>
+        ${rows.map(r=>{ const c=r.campaign||{},m=r.metrics||{},b=r.campaignBudget||{}; return `<div class="camp-row"><span style="flex:2;font-weight:600;">${c.name||'—'}</span><span style="flex:1;">${sPill(c.status)}</span><span style="flex:1;text-align:right;color:#aaa;">${fmtBudget(b.amountMicros)}</span><span style="flex:1;text-align:right;">${fmt(m.impressions)}</span><span style="flex:1;text-align:right;font-weight:600;">${fmt(m.clicks)}</span><span style="flex:1;text-align:right;">${fmtCTR(m.ctr)}</span><span style="flex:1;text-align:right;font-weight:600;">${fmtUSD(m.costMicros)}</span><span style="flex:1;text-align:right;">${Math.round(Number(m.conversions||0))}</span></div>`; }).join('')}`
+      }
+    </div>`;
+}
+
+async function loadData(){
+  if(!RT){ showErr('Please enter your refresh token first.'); return; }
+  $('dash').style.display='none';
+  $('msg').innerHTML='';
+  setStatus('Connecting','pa');
+  try {
+    await doRefresh();
+    const rows = await fetchCampaigns();
+    render(rows);
+  } catch(e){ showErr(e.message); }
+}
+
+async function connectWithRT(){
+  RT = $('rt-input').value.trim();
+  if(!RT) return;
+  localStorage.setItem('sail_rt', RT);
+  $('auth-card').style.display='none';
+  await loadData();
+}
+
+if(RT) loadData();
+</script>
+</body>
+</html>
